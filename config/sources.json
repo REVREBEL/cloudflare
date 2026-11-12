@@ -1,0 +1,44 @@
+{
+  "sources": [
+    {
+      "id": "github",
+      "url": "https://api.github.com/meta",
+      "fields": [
+        "hooks"
+      ],
+      "minimum": 1
+    },
+    {
+      "id": "linear",
+      "url": "https://linear.app/.well-known/appspecific/app.linear.ips.json",
+      "fields": [
+        "ips",
+        "codingSessionIps"
+      ],
+      "minimum": 1
+    },
+    {
+      "id": "chatgpt",
+      "url": "https://openai.com/chatgpt-connectors.json",
+      "fields": [
+        "prefixes[].ipv4Prefix",
+        "prefixes[].ipv6Prefix"
+      ],
+      "minimum": 1
+    },
+    {
+      "id": "codex",
+      "url": "https://openai.com/chatgpt-agents.json",
+      "fields": [
+        "prefixes[].ipv4Prefix",
+        "prefixes[].ipv6Prefix"
+      ],
+      "minimum": 1
+    }
+  ],
+  "staticIps": [
+    "67.168.139.148/32"
+  ],
+  "maxEntries": 10000,
+  "minimumRetentionFraction": 0.5
+}

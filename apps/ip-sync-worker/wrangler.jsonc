@@ -1,0 +1,15 @@
+{
+  "name": "revrebel-ip-sync",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-01",
+  "triggers": {
+    "crons": [
+      "0 12 * * *"
+    ]
+  },
+  "vars": {
+    "DRY_RUN": "true",
+    "CLOUDFLARE_ACCOUNT_ID": "4c154709ffe87621073f9ecfa86a57dd",
+    "CLOUDFLARE_LIST_ID": "fd38789f05e446918bdea481a9861d6d"
+  }
+}
