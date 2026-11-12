@@ -1,0 +1,17 @@
+{
+  "name": "@revrebel/cloudflare",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "check": "npm run check --workspace @revrebel/ip-sync-worker",
+    "dev:ip-sync": "npm run dev --workspace @revrebel/ip-sync-worker",
+    "deploy:ip-sync": "npm run deploy --workspace @revrebel/ip-sync-worker"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
