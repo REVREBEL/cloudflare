@@ -22,7 +22,7 @@ function fixture(missing = '') {
     triggers:{crons:['0 12 * * 1,4']}
   }));
   const vals = {
-    DOMAIN:'revrebel.io', CLOUDFLARE_API_TOKEN:'test-secret-token',
+    DOMAIN:'revrebel.io', CLOUDFLARE_API_TOKEN:'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     CLOUDFLARE_ACCOUNT_ID:'a'.repeat(32), CLOUDFLARE_ZONE_ID:'b'.repeat(32),
     LOCALIP:'{192.0.2.10,192.0.2.10}', DRY_RUN:'true',
   };
@@ -39,7 +39,7 @@ function fixture(missing = '') {
     'fs.writeFileSync(process.env.CAPTURE,JSON.stringify({args,',
     "vars:JSON.parse(fs.readFileSync(config,'utf8')).vars,",
     "secrets:JSON.parse(fs.readFileSync(secret,'utf8')),",
-    "tokenAvailable:process.env.CLOUDFLARE_API_TOKEN==='test-secret-token'}));"
+    "tokenAvailable:process.env.CLOUDFLARE_API_TOKEN==='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'}));"
   ].join('\n')+'\n');
   chmodSync(fake,0o700);
   return {
@@ -61,13 +61,35 @@ test('deploy reads .env, injects runtime bindings and uploads only selected secr
     assert.equal(result.vars.DOMAIN,'revrebel.io');
     assert.equal(result.vars.CLOUDFLARE_ZONE_ID,'b'.repeat(32));
     assert.equal(result.secrets.LOCALIP,'{192.0.2.10,192.0.2.10}');
-    assert.equal(result.secrets.CLOUDFLARE_API_TOKEN,'test-secret-token');
+    assert.equal(result.secrets.CLOUDFLARE_API_TOKEN,'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
     assert.deepEqual(Object.keys(result.secrets).sort(),['CLOUDFLARE_API_TOKEN','LOCALIP']);
     assert.ok(result.tokenAvailable);
     assert.ok(result.args.includes('--secrets-file'));
-    assert.ok(!r.stdout.includes('test-secret-token'));
+    assert.ok(!r.stdout.includes('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'));
     assert.ok(!r.stdout.includes('192.0.2.10'));
   }finally{f.cleanup()}
+});
+test('Bearer prefix is stripped without revealing the credential',()=>{
+  const f=fixture();
+  try {
+    const envPath=join(f.folder,'apps/ip-sync-worker/.env');
+    const current=readFileSync(envPath,'utf8');
+    writeFileSync(envPath,current.replace('CLOUDFLARE_API_TOKEN="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"','CLOUDFLARE_API_TOKEN="Bearer aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"'));
+    const r=f.run();
+    assert.equal(r.status,0,r.stderr);
+    assert.equal(JSON.parse(readFileSync(f.capture,'utf8')).secrets.CLOUDFLARE_API_TOKEN,'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
+    assert.ok(!r.stdout.includes('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'));
+  } finally {f.cleanup()}
+});
+test('malformed token fails before invoking Wrangler',()=>{
+  const f=fixture();
+  try {
+    const envPath=join(f.folder,'apps/ip-sync-worker/.env');
+    writeFileSync(envPath,readFileSync(envPath,'utf8').replace('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','https://invalid/token'));
+    const r=f.run();
+    assert.notEqual(r.status,0);
+    assert.match(r.stderr,/not a validly formatted API token/);
+  } finally {f.cleanup()}
 });
 test('missing required env blocks deployment before invoking Wrangler',()=>{
   const f=fixture('LOCALIP');
