@@ -6,7 +6,7 @@
       "fields": [
         "hooks"
       ],
-      "minimum": 1
+      "minimum": 5
     },
     {
       "id": "linear",
@@ -15,7 +15,7 @@
         "ips",
         "codingSessionIps"
       ],
-      "minimum": 1
+      "minimum": 15
     },
     {
       "id": "chatgpt",
@@ -24,7 +24,7 @@
         "prefixes[].ipv4Prefix",
         "prefixes[].ipv6Prefix"
       ],
-      "minimum": 1
+      "minimum": 100
     },
     {
       "id": "codex",
@@ -33,7 +33,7 @@
         "prefixes[].ipv4Prefix",
         "prefixes[].ipv6Prefix"
       ],
-      "minimum": 1
+      "minimum": 1000
     }
   ],
   "maxEntries": 10000,
