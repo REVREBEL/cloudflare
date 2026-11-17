@@ -2,3 +2,9 @@ node_modules/
 .wrangler/
 .dev.vars
 .DS_Store
+
+# Local Worker environment overrides and credentials
+.env
+.env.*
+!.env.example
+.dev.vars.*
