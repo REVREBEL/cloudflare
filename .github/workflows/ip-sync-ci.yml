@@ -3,6 +3,8 @@ on:
   pull_request:
     paths:
       - 'apps/ip-sync-worker/**'
+      - 'scripts/deploy-ip-sync.mjs'
+      - 'scripts/deploy-ip-sync.mjs'
       - 'config/sources.json'
       - '.github/workflows/ip-sync-ci.yml'
   push:
@@ -26,4 +28,5 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check
+      - run: npm run check:deploy
       - run: npm run test --workspace @revrebel/ip-sync-worker
