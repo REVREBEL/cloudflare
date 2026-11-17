@@ -36,9 +36,6 @@
       "minimum": 1
     }
   ],
-  "staticIps": [
-    "67.168.139.148/32"
-  ],
   "maxEntries": 10000,
   "minimumRetentionFraction": 0.5
 }
