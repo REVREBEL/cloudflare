@@ -3,6 +3,7 @@ import config from "../../../config/sources.json";
 type Source = (typeof config.sources)[number];
 interface Env {
   DRY_RUN: string;
+  LOCALIP?: string;
   CLOUDFLARE_ACCOUNT_ID: string;
   CLOUDFLARE_LIST_ID: string;
   CLOUDFLARE_API_TOKEN?: string;
@@ -39,6 +40,25 @@ function canonical(value: string): string {
   return value.includes("/") ? value : value + (value.includes(":") ? "/128" : "/32");
 }
 
+// Accept comma/newline-separated IPs, optionally wrapped in braces or JSON brackets.
+// Examples: LOCALIP="{192.0.2.10, 192.0.2.11/32}" or LOCALIP='["192.0.2.10"]'.
+function parseLocalIps(raw: string | undefined): { entries: string[]; supplied: number; duplicatesRemoved: number } {
+  if (typeof raw !== "string" || !raw.trim()) throw new Error("LOCALIP must be configured with at least one trusted IP");
+  let value = raw.trim();
+  if ((value.startsWith("{") && value.endsWith("}")) || (value.startsWith("[") && value.endsWith("]"))) {
+    value = value.slice(1, -1);
+  } else if (value.startsWith("{") || value.endsWith("}") || value.startsWith("[") || value.endsWith("]")) {
+    throw new Error("LOCALIP has unmatched delimiters");
+  }
+  const input = value.split(/[,\n\r]+/).map(x => x.trim().replace(/^["']|["']$/g, "").trim()).filter(Boolean);
+  if (input.length === 0) throw new Error("LOCALIP must contain at least one IP address");
+  // Reject malformed values rather than silently deleting one of the trusted addresses.
+  const entries = input.map(canonical);
+  if (entries.some(ip => !validCidr(ip))) throw new Error("LOCALIP includes an invalid IPv4/IPv6 CIDR");
+  const unique = [...new Set(entries)].sort();
+  return { entries: unique, supplied: input.length, duplicatesRemoved: input.length - unique.length };
+}
+
 async function retrieve(source: Source): Promise<Snapshot> {
   const response = await fetch(source.url, { headers: { Accept: "application/json", "User-Agent": "REVREBEL-IP-Sync/1.0" }, signal: AbortSignal.timeout(15000) });
   if (!response.ok) throw new Error(source.id + " returned HTTP " + response.status);
@@ -51,8 +71,21 @@ async function retrieve(source: Source): Promise<Snapshot> {
 
 async function run(env: Env): Promise<void> {
   // Never partially publish an incomplete feed. Fail closed on any source error.
+  const local = parseLocalIps(env.LOCALIP);
   const snapshots = await Promise.all(config.sources.map(retrieve));
-  const entries = [...new Set([...snapshots.flatMap(s => s.entries), ...config.staticIps.map(canonical)])].sort();
+  const providerEntries = snapshots.flatMap(s => s.entries);
+  const entries = [...new Set([...providerEntries, ...local.entries])].sort();
+  const verification = {
+    localIpPresent: local.entries.every(ip => entries.includes(ip)),
+    localIpCount: local.entries.length,
+    localDuplicatesRemoved: local.duplicatesRemoved,
+    providerEntries: providerEntries.length,
+    uniqueEntries: entries.length,
+    duplicatesRemoved: providerEntries.length + local.supplied - entries.length,
+    duplicatesRemaining: entries.length - new Set(entries).size,
+  };
+  console.log(JSON.stringify({ event: "ip-sync-verification", ...verification }));
+  if (!verification.localIpPresent || verification.duplicatesRemaining !== 0) throw new Error("Merged IP list verification failed");
   if (entries.some(ip => !validCidr(ip)) || entries.length > config.maxEntries) throw new Error("Merged list failed validation");
   console.log(JSON.stringify({ event: "ip-sync-plan", count: entries.length, providers: snapshots.map(s => ({ name: s.name, count: s.entries.length })), dryRun: env.DRY_RUN !== "false" }));
   // Intentional deployment gate: a separate reviewed implementation will update
