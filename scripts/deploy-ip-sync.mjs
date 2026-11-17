@@ -47,8 +47,8 @@ values = {
 const rawToken = values.CLOUDFLARE_API_TOKEN;
 if (typeof rawToken === 'string') {
   const trimmed = rawToken.trim();
-  if (/^Bearer\\s+/i.test(trimmed)) {
-    values.CLOUDFLARE_API_TOKEN = trimmed.replace(/^Bearer\\s+/i, '').trim();
+  if (/^Bearer\s+/i.test(trimmed)) {
+    values.CLOUDFLARE_API_TOKEN = trimmed.replace(/^Bearer\s+/i, '').trim();
     console.warn('CLOUDFLARE_API_TOKEN: removed an accidental Bearer prefix from the local value.');
   } else {
     values.CLOUDFLARE_API_TOKEN = trimmed;
