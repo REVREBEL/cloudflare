@@ -8,10 +8,15 @@
   ],
   "scripts": {
     "check": "npm run check --workspace @revrebel/ip-sync-worker",
-    "dev:ip-sync": "npm run dev --workspace @revrebel/ip-sync-worker",
+    "dev:ip-sync": "npm exec --workspace @revrebel/ip-sync-worker -- wrangler dev",
     "deploy:ip-sync": "npm run deploy --workspace @revrebel/ip-sync-worker"
   },
   "engines": {
     "node": ">=20"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "workerd@1.20261110.1": true,
+    "fsevents@2.3.3": false
   }
 }
