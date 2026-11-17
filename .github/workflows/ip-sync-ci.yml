@@ -4,13 +4,13 @@ on:
     paths:
       - 'apps/ip-sync-worker/**'
       - 'scripts/deploy-ip-sync.mjs'
-      - 'scripts/deploy-ip-sync.mjs'
       - 'config/sources.json'
       - '.github/workflows/ip-sync-ci.yml'
   push:
     branches: [main]
     paths:
       - 'apps/ip-sync-worker/**'
+      - 'scripts/deploy-ip-sync.mjs'
       - 'config/sources.json'
       - '.github/workflows/ip-sync-ci.yml'
 
