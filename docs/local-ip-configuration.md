@@ -1,47 +1,49 @@
-# Configuring trusted IP addresses
+# Environment-driven deployment
 
-The Worker reads trusted administrative addresses from its `LOCALIP` environment binding. Addresses are no longer stored in `config/sources.json`.
+The deployment reads `apps/ip-sync-worker/.env` (and optionally a root `.env`, with Worker values taking precedence). Existing process environment variables override file values for CI.
 
-## Local development
-
-From the repository root:
+## Local environment
 
 ```sh
 cp apps/ip-sync-worker/.env.example apps/ip-sync-worker/.env
 ```
 
-Edit `apps/ip-sync-worker/.env` and replace the documentation-only addresses. For example:
+The file must contain:
 
 ```dotenv
-LOCALIP="{192.0.2.10,192.0.2.11,192.0.2.10}"
+DOMAIN="revrebel.io"
+CLOUDFLARE_API_TOKEN="<YOUR_SCOPED_TOKEN>"
+CLOUDFLARE_ACCOUNT_ID="<YOUR_ACCOUNT_ID>"
+CLOUDFLARE_ZONE_ID="<YOUR_ZONE_ID>"
+LOCALIP="{192.0.2.10,192.0.2.11}"
+DRY_RUN="true"
 ```
 
-The braces are optional. Commas and newlines are supported *within the quoted value*. Bare IPv4 addresses become `/32`; bare IPv6 addresses become `/128`. Exact duplicates are removed. The Worker fails rather than continuing if `LOCALIP` is missing or contains invalid addresses. At least one address is required.
+The IPs above are documentation placeholders. You can optionally supply `CLOUDFLARE_LIST_ID`; otherwise the existing list ID in `wrangler.jsonc` is retained.
 
-Keep `.env` in the same directory as `wrangler.jsonc`. Wrangler loads it for **local** development; `npm run dev:ip-sync` (or `cd apps/ip-sync-worker && npx wrangler dev --test-scheduled`) uses the Worker configuration. If a `.dev.vars` file exists, Wrangler uses it instead of `.env`, so remove it or also configure `LOCALIP` there.
+## One deployment command
 
-Run a scheduled test:
+From the repository root:
 
 ```sh
-cd apps/ip-sync-worker
-npx wrangler dev --test-scheduled
-# In another terminal:
-curl -i http://localhost:8787/cdn-cgi/local/scheduled
+npm run deploy:ip-sync
 ```
 
-Check for the `ip-sync-verification` event, including `localIpPresent: true`, `duplicatesRemaining: 0`, and the `ip-sync-plan` event with `dryRun: true`. Do not confuse exact duplicate removal with CIDR overlap elimination; overlapping networks are not yet collapsed.
+This command validates the input, passes `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` to Wrangler for CLI authentication, overrides the Worker's public runtime variables (`DOMAIN`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_ZONE_ID`, `DRY_RUN`), and uploads **only** `LOCALIP` and `CLOUDFLARE_API_TOKEN` as encrypted Worker secrets alongside the code using Wrangler's `--secrets-file` option. No manual `wrangler secret put` is required.
 
-## Cloudflare production configuration
+The deployment utility uses temporary files, restricts their permissions, and deletes them when the operation ends. The actual `.env` file remains excluded from Git. Never add credentials to `wrangler.jsonc` or `.env.example`.
 
-**`.env` files are local only. They do not automatically publish into a deployed Worker.** Before a future deployment, set a production Worker secret explicitly:
+You may also run `npm run deploy` inside `apps/ip-sync-worker`, which calls the same utility. Direct `npx wrangler deploy` bypasses the automatic environment provisioning and is **not** recommended.
+
+The token must have both Worker deployment permissions (**Workers Scripts Edit**) and the runtime permissions required to read zones/rulesets and edit account IP lists. `DRY_RUN=true` produces only verification logs; `DRY_RUN=false` allows publishing on the **next scheduled execution**, assuming the token and safety checks pass. Deployment alone does not trigger the cron.
+
+## Validation
 
 ```sh
-cd apps/ip-sync-worker
-npx wrangler secret put LOCALIP
+npm ci
+npm run check
+npm run check:deploy
+npm run test --workspace @revrebel/ip-sync-worker
 ```
 
-Enter the comma-separated/braced list when prompted. Cloudflare stores the value as a Worker secret; it is not stored in Git. Do not set actual addresses in the public `wrangler.jsonc` or commit your `.env` file. The Worker remains read-only even if `DRY_RUN` is changed; production list publishing is not implemented yet.
-
-## Log fields
-
-`ip-sync-verification` reports `localIpPresent`, `localIpCount`, `localDuplicatesRemoved`, `providerEntries`, `uniqueEntries`, `duplicatesRemoved`, and `duplicatesRemaining`. It deliberately omits actual IP addresses.
+Worker cron: Monday and Thursday, 12:00 UTC. `workers_dev` and `preview_urls` remain disabled.
