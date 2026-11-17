@@ -29,17 +29,40 @@ for (const file of [rootPath, localPath]) {
 if (!existsSync(rootPath) && !existsSync(localPath)) {
   fail('Missing .env. Copy apps/ip-sync-worker/.env.example to apps/ip-sync-worker/.env');
 }
-// Environment already set in the process wins, for CI/noninteractive deployments.
-values = { ...values, ...Object.fromEntries(
-  ['DOMAIN', 'CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_ACCOUNT_ID',
-   'CLOUDFLARE_ZONE_ID', 'CLOUDFLARE_LIST_ID', 'LOCALIP', 'DRY_RUN']
-    .filter(key => process.env[key] !== undefined)
-    .map(key => [key, process.env[key]])
-) };
+// Local .env is authoritative when present. An inherited shell token should
+// never silently override the token the operator just configured in .env.
+// In CI, process.env values supply variables absent from local files.
+values = {
+  ...Object.fromEntries(
+    ['DOMAIN', 'CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_ACCOUNT_ID',
+     'CLOUDFLARE_ZONE_ID', 'CLOUDFLARE_LIST_ID', 'LOCALIP', 'DRY_RUN']
+      .filter(key => process.env[key] !== undefined)
+      .map(key => [key, process.env[key]])
+  ),
+  ...values,
+};
+
+// Normalize a commonly copied "Bearer <token>" value. Do not pass the
+// prefix to Wrangler: Wrangler constructs its own Authorization header.
+const rawToken = values.CLOUDFLARE_API_TOKEN;
+if (typeof rawToken === 'string') {
+  const trimmed = rawToken.trim();
+  if (/^Bearer\\s+/i.test(trimmed)) {
+    values.CLOUDFLARE_API_TOKEN = trimmed.replace(/^Bearer\\s+/i, '').trim();
+    console.warn('CLOUDFLARE_API_TOKEN: removed an accidental Bearer prefix from the local value.');
+  } else {
+    values.CLOUDFLARE_API_TOKEN = trimmed;
+  }
+}
 
 for (const key of ['DOMAIN', 'CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_ACCOUNT_ID',
                    'CLOUDFLARE_ZONE_ID', 'LOCALIP', 'DRY_RUN']) {
   if (!values[key]?.trim()) fail('Missing required environment variable: ' + key);
+}
+// Cloudflare API tokens are opaque, URL-safe strings. Fail before Wrangler
+// when the value is a placeholder, a Global API Key, or a malformed header.
+if (!/^[A-Za-z0-9_-]{30,256}$/.test(values.CLOUDFLARE_API_TOKEN)) {
+  fail('CLOUDFLARE_API_TOKEN is not a validly formatted API token. Use only the raw token value from Cloudflare (not a URL, Bearer header, or API key); check for a stale .env entry.');
 }
 if (!/^[0-9a-f]{32}$/i.test(values.CLOUDFLARE_ACCOUNT_ID)) fail('CLOUDFLARE_ACCOUNT_ID must be 32 hexadecimal characters');
 if (!/^[0-9a-f]{32}$/i.test(values.CLOUDFLARE_ZONE_ID)) fail('CLOUDFLARE_ZONE_ID must be 32 hexadecimal characters');
